@@ -1,0 +1,59 @@
+# SUBSYSTEM: USB Devices
+# This file creates persistent device names for GRACE robot hardware
+# Installation: sudo cp 99-grace-robot.rules /etc/udev/rules.d/
+#              sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# ============================================================================
+# RPLidar A2M7 - 2D Laser Scanner
+# ============================================================================
+# Slamtec RPLidar USB to Serial adapter (CP2102)
+# Creates symlink: /dev/rplidar
+KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE:="0666", GROUP:="dialout", SYMLINK+="rplidar"
+
+# Alternative: If multiple CP2102 devices, use serial number
+# Find serial: udevadm info -a -n /dev/ttyUSB0 | grep serial
+# KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="YOUR_SERIAL_HERE", MODE:="0666", SYMLINK+="rplidar"
+
+
+# ============================================================================
+# Arduino - Motor Controller Interface
+# ============================================================================
+# Arduino Uno/Nano (ATmega328P)
+# Creates symlink: /dev/arduino
+KERNEL=="ttyACM*", ATTRS{idVendor}=="2341", ATTRS{idProduct}=="0043", MODE:="0666", GROUP:="dialout", SYMLINK+="arduino"
+
+# Arduino Mega (ATmega2560)
+KERNEL=="ttyACM*", ATTRS{idVendor}=="2341", ATTRS{idProduct}=="0042", MODE:="0666", GROUP:="dialout", SYMLINK+="arduino"
+
+# Generic Arduino (CH340 USB-Serial)
+KERNEL=="ttyUSB*", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE:="0666", GROUP:="dialout", SYMLINK+="arduino"
+
+# Alternative: Use serial number for specific Arduino
+# Find serial: udevadm info -a -n /dev/ttyACM0 | grep serial
+# KERNEL=="ttyACM*", ATTRS{idVendor}=="2341", ATTRS{serial}=="YOUR_SERIAL_HERE", MODE:="0666", SYMLINK+="arduino"
+
+
+# ============================================================================
+# I2C Devices (MPU6050 IMU)
+# ============================================================================
+# I2C bus permissions for IMU sensor
+# MPU6050 typically on I2C bus 1 at address 0x68
+KERNEL=="i2c-[0-9]*", GROUP:="i2c", MODE:="0666"
+
+
+# ============================================================================
+# Notes
+# ============================================================================
+# - MODE:="0666" grants read/write to all users
+# - GROUP:="dialout" or "i2c" assigns device to specific group
+# - SYMLINK+="name" creates persistent /dev/name link
+# - Unplug/replug devices or run: sudo udevadm trigger
+# - Verify: ls -l /dev/rplidar /dev/arduino /dev/i2c-*
+#
+# Find device IDs:
+#   lsusb                                    # List all USB devices
+#   udevadm info -a -n /dev/ttyUSB0          # Get device attributes
+#   udevadm info -a -n /dev/ttyACM0          # Get Arduino attributes
+#
+# Debug rules:
+#   udevadm test $(udevadm info -q path -n /dev/ttyUSB0) 2>&1

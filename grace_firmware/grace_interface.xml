@@ -1,0 +1,10 @@
+<library path="grace_firmware">
+    <class name="grace_firmware/GraceInterface"
+      type="grace_firmware::GraceInterface"
+      base_class_type="hardware_interface::SystemInterface"
+    >
+      <description>
+        Grace Hardware Interface
+      </description>
+    </class>
+  </library>

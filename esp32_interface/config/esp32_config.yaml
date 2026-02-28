@@ -1,0 +1,20 @@
+# ESP32 Interface Configuration Example
+# Copy this to your own config file and modify as needed
+
+esp32_interface:
+  ros__parameters:
+    # Serial port configuration
+    serial_port: "/dev/grace_esp32"
+    baud_rate: 115200
+    
+    # Robot physical parameters
+    wheel_radius: 0.065  # meters (6.5 cm)
+    wheel_base: 0.3      # meters (distance between wheels)
+    
+    # Frame IDs for TF tree
+    imu1_frame_id: "imu1_link"
+    imu2_frame_id: "imu2_link"
+    
+    # Joint names for robot state publisher
+    left_wheel_joint: "left_wheel_joint"
+    right_wheel_joint: "right_wheel_joint"

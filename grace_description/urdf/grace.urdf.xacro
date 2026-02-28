@@ -1,0 +1,367 @@
+<?xml version="1.0"?>
+
+<robot name="grace" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- Start GZ or Ignition depending on ROS 2 Version -->
+  <xacro:arg name="is_ignition" default="true"/>
+
+  <!-- Load Simulated or Real Hardware Interfaces -->
+  <xacro:arg name="is_sim" default="true"/>
+
+  <!-- Include Gazebo Parameters -->
+  <xacro:include filename="$(find grace_description)/urdf/grace_gazebo.xacro" />
+
+  <!-- Include ros2_control Plugins -->
+  <xacro:include filename="$(find grace_description)/urdf/grace_ros2_control.xacro" />
+
+  <link name="base_footprint"/>
+  
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0.00068947 0.0052018 0.049907" rpy="0 0 0" />
+      <mass value="23"/>
+      <inertia ixx="0.091538" ixy="0.00043845" ixz="-1.749E-05"
+               iyy="0.079993" iyz="1.1362E-05"
+               izz="0.16455" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/base_link.STL" />
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link" />
+    <origin xyz="0 0 0.04455" rpy="0 0 0"/>
+  </joint>
+
+  <link name="wheel_right_link">
+    <inertial>
+      <origin xyz="-4.5471E-16 1.5931E-05 -0.0017716" rpy="0 0 0" />
+      <mass value="3.0851" />
+      <inertia ixx="0.0053971" ixy="-8.1468E-19" ixz="8.9511E-16"
+               iyy="0.0053974" iyz="-1.5698E-06"
+               izz="0.0090468" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/wheel_right_link.STL" />
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/wheel_right_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="wheel_right_joint" type="continuous">
+    <origin xyz="0.0005 -0.22734 0.038" rpy="-1.5708 0 0" />
+    <parent link="base_link" />
+    <child link="wheel_right_link" />
+    <axis xyz="0 0 1" />
+    <limit effort="10" velocity="16.76" />
+  </joint>
+  
+  <link
+    name="wheel_left_link">
+    <inertial>
+      <origin xyz="-1.1532E-15 1.5931E-05 0.0017716" rpy="0 0 0" />
+      <mass value="3.0851" />
+      <inertia ixx="0.0053971" ixy="6.2494E-19" ixz="8.802E-16"
+               iyy="0.0053974" iyz="1.5698E-06"
+               izz="0.0090468" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/wheel_left_link.STL" />
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/wheel_left_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="wheel_left_joint" type="continuous">
+    <origin xyz="-0.0005 0.22734 0.038" rpy="-1.5708 0 0" />
+    <parent link="base_link" />
+    <child link="wheel_left_link" />
+    <axis xyz="0 0 1" />
+    <limit effort="10" velocity="16.76" />
+  </joint>
+
+  <!-- 4 Caster Wheels -->
+  <link name="caster_back_left_link">
+    <inertial>
+      <origin xyz="-0.00013148 -0.00022774 -0.019992" rpy="0 0 0" />
+      <mass value="0.5" />
+      <inertia ixx="0.0001479" ixy="-8.6224E-08" ixz="5.1937E-07"
+               iyy="0.00014781" iyz="8.9958E-07"
+               izz="0.00018852" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/caster_back_left_link.STL" />
+      </geometry>
+      <material name="silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/caster_back_left_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="caster_back_left_joint" type="fixed">
+    <origin xyz="-0.14848 0.085725 0.0005" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="caster_back_left_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <link name="caster_back_right_link">
+    <inertial>
+      <origin xyz="-0.00013148 0.00022774 -0.019992" rpy="0 0 0" />
+      <mass value="0.5" />
+      <inertia ixx="0.0001479" ixy="8.6224E-08" ixz="5.1937E-07"
+               iyy="0.00014781" iyz="-8.9958E-07"
+               izz="0.00018852" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/caster_back_right_link.STL" />
+      </geometry>
+      <material name="silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/caster_back_right_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="caster_back_right_joint" type="fixed">
+    <origin xyz="-0.14848 -0.085725 0.0005" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="caster_back_right_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <link name="caster_front_left_link">
+    <inertial>
+      <origin xyz="-0.00013148 0.00022774 -0.019992" rpy="0 0 0" />
+      <mass value="0.5" />
+      <inertia ixx="0.0001479" ixy="8.6224E-08" ixz="5.1937E-07"
+               iyy="0.00014781" iyz="-8.9958E-07"
+               izz="0.00018852" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/caster_front_left_link.STL" />
+      </geometry>
+      <material name="silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/caster_front_left_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="caster_front_left_joint" type="fixed">
+    <origin xyz="0.14848 0.085725 0.0005" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="caster_front_left_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <link name="caster_front_right_link">
+    <inertial>
+      <origin xyz="0.00013148 0.00022774 -0.019992" rpy="0 0 0" />
+      <mass value="0.5" />
+      <inertia ixx="0.0001479" ixy="-8.6224E-08" ixz="-5.1937E-07"
+               iyy="0.00014781" iyz="-8.9958E-07"
+               izz="0.00018852" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/caster_front_right_link.STL" />
+      </geometry>
+      <material name="silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/caster_front_right_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="caster_front_right_joint" type="fixed">
+    <origin xyz="0.14848 -0.085725 0.0005" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="caster_front_right_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+
+  <link name="imu_link">
+    <inertial>
+      <origin xyz="0.001149 -0.0017235 0.0055302" rpy="0 0 0"/>
+      <mass value="0.033614"/>
+      <inertia ixx="3.4255E-05" ixy="1.0724E-07" ixz="-1.8854E-07"
+               iyy="3.6715E-05" iyz="2.8281E-07"
+               izz="6.9538E-05"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/imu_link.STL" />
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/imu_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint name="imu_joint" type="fixed">
+    <origin xyz="-0.0105 -0.042038 0.094" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+
+  <!-- Additional IMU Sensors -->
+  <link name="imu_back_link">
+    <inertial>
+      <origin xyz="-0.00018098 1.4563E-18 0.00051166" rpy="0 0 0" />
+      <mass value="0.00039371" />
+      <inertia ixx="1.2332E-08" ixy="-6.7055E-26" ixz="-1.1671E-12"
+               iyy="7.8417E-09" iyz="1.429E-23"
+               izz="2.0109E-08" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/imu_back_link.STL" />
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/imu_back_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="imu_back_joint" type="fixed">
+    <origin xyz="-0.1932 0 0.031" rpy="0 1.5708 0" />
+    <parent link="base_link" />
+    <child link="imu_back_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <link name="imu_front_link">
+    <inertial>
+      <origin xyz="-0.00018098 1.3083E-16 0.00051166" rpy="0 0 0" />
+      <mass value="0.00039371" />
+      <inertia ixx="1.2332E-08" ixy="-2.1353E-23" ixz="-1.1671E-12"
+               iyy="7.8417E-09" iyz="3.0614E-21"
+               izz="2.0109E-08" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/imu_front_link.STL" />
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/imu_front_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="imu_front_joint" type="fixed">
+    <origin xyz="0.1932 0 0.031" rpy="3.1416 1.5708 0" />
+    <parent link="base_link" />
+    <child link="imu_front_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <link name="laser_link">
+    <inertial>
+      <origin xyz="6.8724E-05 7.6545E-06 -0.029536" rpy="0 0 0" />
+      <mass value="2.2373" />
+      <inertia ixx="0.020805" ixy="6.5467E-08" ixz="2.395E-07"
+               iyy="0.0234" iyz="2.623E-08"
+               izz="0.044191" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/laser_link.STL" />
+      </geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/laser_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="laser_joint" type="fixed">
+    <origin xyz="0 0 0.2321" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="laser_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <material name="blue">
+    <color rgba="0 0 1 1"/>
+  </material>
+  <material name="black">
+    <color rgba="0 0 0 1"/>
+  </material>
+  <material name="silver">
+    <color rgba="0.79 0.82 0.93 1"/>
+  </material>
+  <material name="dark_grey">
+    <color rgba="0.3 0.3 0.3 1"/>
+  </material>
+
+</robot>
