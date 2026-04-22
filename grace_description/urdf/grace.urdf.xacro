@@ -351,6 +351,46 @@
     <axis xyz="0 0 0" />
   </joint>
 
+  <!-- Camera -->
+  <link name="camera_link">
+    <inertial>
+      <origin xyz="-0.019934 -0.030537 -0.049914" rpy="0 0 0" />
+      <mass value="0.27538" />
+      <inertia ixx="0.00029613" ixy="2.0639E-07" ixz="3.1613E-06"
+               iyy="0.00015935" iyz="9.9814E-09"
+               izz="0.00017529" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/Camera_Link.STL" />
+      </geometry>
+      <material name="yellow"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://grace_description/meshes/Camera_Link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <origin xyz="-0.19268 0.030962 0.2792" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="camera_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <!-- Camera Optical Frame (Z forward, X right, Y down) -->
+  <link name="camera_optical_frame"/>
+
+  <joint name="camera_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708" />
+    <parent link="camera_link" />
+    <child link="camera_optical_frame" />
+  </joint>
+
   <material name="blue">
     <color rgba="0 0 1 1"/>
   </material>
@@ -362,6 +402,9 @@
   </material>
   <material name="dark_grey">
     <color rgba="0.3 0.3 0.3 1"/>
+  </material>
+  <material name="yellow">
+    <color rgba="1 0.85 0 1"/>
   </material>
 
 </robot>

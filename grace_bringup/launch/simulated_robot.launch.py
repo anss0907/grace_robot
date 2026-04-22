@@ -95,6 +95,12 @@ def generate_launch_description():
         parameters=[{"use_sim_time": True}]
     )
     
+    image_view = Node(
+        package="rqt_image_view",
+        executable="rqt_image_view",
+        arguments=["/camera/image_raw"]
+    )
+
     return LaunchDescription([
         use_slam_arg,
         map_name_arg,
@@ -105,4 +111,5 @@ def generate_launch_description():
         slam,
         navigation,
         rviz,
+        image_view,
     ])
