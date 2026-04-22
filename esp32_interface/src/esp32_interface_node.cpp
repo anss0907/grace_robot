@@ -3,7 +3,12 @@
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <sensor_msgs/msg/battery_state.hpp>
 #include <sensor_msgs/msg/temperature.hpp>
+#include <sensor_msgs/msg/fluid_pressure.hpp>
+#include <sensor_msgs/msg/relative_humidity.hpp>
 #include <std_msgs/msg/int16.hpp>
+#include <std_msgs/msg/float32.hpp>
+#include <std_msgs/msg/u_int16.hpp>
+#include <std_msgs/msg/string.hpp>
 
 #include <fcntl.h>
 #include <termios.h>
@@ -33,7 +38,7 @@ public:
     // Declare parameters
     this->declare_parameter<std::string>("serial_port", "/dev/grace_esp32");
     this->declare_parameter<int>("baud_rate", 115200);
-    this->declare_parameter<double>("wheel_radius", 0.065);  // meters
+    this->declare_parameter<double>("wheel_radius", 0.065);
     this->declare_parameter<std::string>("imu1_frame_id", "imu1_link");
     this->declare_parameter<std::string>("imu2_frame_id", "imu2_link");
     this->declare_parameter<std::string>("left_wheel_joint", "left_wheel_joint");
@@ -48,14 +53,32 @@ public:
     left_wheel_joint_ = this->get_parameter("left_wheel_joint").as_string();
     right_wheel_joint_ = this->get_parameter("right_wheel_joint").as_string();
     
-    // Create publishers
+    // ===================== Publishers =====================
+    
+    // Existing
     imu1_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu1/data", 10);
     imu2_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu2/data", 10);
     joint_state_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
     battery_pub_ = this->create_publisher<sensor_msgs::msg::BatteryState>("battery_state", 10);
-    temperature_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("temperature", 10);
+    board_temp_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("board_temperature", 10);
     
-    // Create subscribers for direct motor commands (RPM)
+    // BME680 environmental sensor
+    bme_temp_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("bme680/temperature", 10);
+    bme_humidity_pub_ = this->create_publisher<sensor_msgs::msg::RelativeHumidity>("bme680/humidity", 10);
+    bme_pressure_pub_ = this->create_publisher<sensor_msgs::msg::FluidPressure>("bme680/pressure", 10);
+    bme_gas_pub_ = this->create_publisher<std_msgs::msg::Float32>("bme680/gas_resistance", 10);
+    
+    // PMS5003 air quality sensor
+    pm1_0_pub_ = this->create_publisher<std_msgs::msg::UInt16>("air_quality/pm1_0", 10);
+    pm2_5_pub_ = this->create_publisher<std_msgs::msg::UInt16>("air_quality/pm2_5", 10);
+    pm10_pub_ = this->create_publisher<std_msgs::msg::UInt16>("air_quality/pm10", 10);
+    
+    // LED status
+    led_status_pub_ = this->create_publisher<std_msgs::msg::String>("led_status", 10);
+    
+    // ===================== Subscribers =====================
+    
+    // Motor commands
     left_motor_sub_ = this->create_subscription<std_msgs::msg::Int16>(
       "left_motor_rpm", 10,
       std::bind(&ESP32InterfaceNode::leftMotorCallback, this, std::placeholders::_1));
@@ -64,6 +87,11 @@ public:
       "right_motor_rpm", 10,
       std::bind(&ESP32InterfaceNode::rightMotorCallback, this, std::placeholders::_1));
     
+    // LED commands (e.g. "1r", "2g", "3b", "1w", "a")
+    led_cmd_sub_ = this->create_subscription<std_msgs::msg::String>(
+      "led_command", 10,
+      std::bind(&ESP32InterfaceNode::ledCommandCallback, this, std::placeholders::_1));
+    
     // Open serial port
     if (!openSerialPort()) {
       RCLCPP_ERROR(this->get_logger(), "Failed to open serial port: %s", serial_port_.c_str());
@@ -71,8 +99,13 @@ public:
     }
     
     RCLCPP_INFO(this->get_logger(), "ESP32 Interface Node started on port: %s", serial_port_.c_str());
+    RCLCPP_INFO(this->get_logger(), "Publishing: imu1/data, imu2/data, joint_states, battery_state, board_temperature");
+    RCLCPP_INFO(this->get_logger(), "Publishing: bme680/temperature, bme680/humidity, bme680/pressure, bme680/gas_resistance");
+    RCLCPP_INFO(this->get_logger(), "Publishing: air_quality/pm1_0, air_quality/pm2_5, air_quality/pm10");
+    RCLCPP_INFO(this->get_logger(), "Publishing: led_status");
+    RCLCPP_INFO(this->get_logger(), "Subscribing: left_motor_rpm, right_motor_rpm, led_command");
     
-    // Create timer for reading serial data (100Hz to match ESP32 output rate)
+    // Timer for reading serial data (100Hz)
     timer_ = this->create_wall_timer(
       10ms, std::bind(&ESP32InterfaceNode::serialReadCallback, this));
   }
@@ -100,7 +133,6 @@ private:
       return false;
     }
     
-    // Configure serial port
     speed_t speed = B115200;
     switch (baud_rate_) {
       case 9600: speed = B9600; break;
@@ -114,26 +146,26 @@ private:
     cfsetospeed(&tty, speed);
     cfsetispeed(&tty, speed);
     
-    tty.c_cflag &= ~PARENB;        // No parity
-    tty.c_cflag &= ~CSTOPB;        // 1 stop bit
+    tty.c_cflag &= ~PARENB;
+    tty.c_cflag &= ~CSTOPB;
     tty.c_cflag &= ~CSIZE;
-    tty.c_cflag |= CS8;            // 8 data bits
-    tty.c_cflag &= ~CRTSCTS;       // No hardware flow control
-    tty.c_cflag |= CREAD | CLOCAL; // Enable receiver, ignore modem control lines
+    tty.c_cflag |= CS8;
+    tty.c_cflag &= ~CRTSCTS;
+    tty.c_cflag |= CREAD | CLOCAL;
     
-    tty.c_lflag &= ~ICANON;        // Non-canonical mode
-    tty.c_lflag &= ~ECHO;          // Disable echo
+    tty.c_lflag &= ~ICANON;
+    tty.c_lflag &= ~ECHO;
     tty.c_lflag &= ~ECHOE;
     tty.c_lflag &= ~ECHONL;
-    tty.c_lflag &= ~ISIG;          // Disable signal chars
+    tty.c_lflag &= ~ISIG;
     
-    tty.c_iflag &= ~(IXON | IXOFF | IXANY);                    // No software flow control
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
     tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
     
-    tty.c_oflag &= ~OPOST;         // No output processing
+    tty.c_oflag &= ~OPOST;
     tty.c_oflag &= ~ONLCR;
     
-    tty.c_cc[VTIME] = 0;           // No blocking
+    tty.c_cc[VTIME] = 0;
     tty.c_cc[VMIN] = 0;
     
     if (tcsetattr(serial_fd_, TCSANOW, &tty) != 0) {
@@ -142,7 +174,6 @@ private:
       return false;
     }
     
-    // Flush any existing data
     tcflush(serial_fd_, TCIOFLUSH);
     
     return true;
@@ -161,23 +192,19 @@ private:
       read_buf[n] = '\0';
       buffer_ += std::string(read_buf);
       
-      // Process complete lines
       size_t pos;
       while ((pos = buffer_.find('\n')) != std::string::npos) {
         std::string line = buffer_.substr(0, pos);
         buffer_.erase(0, pos + 1);
         
-        // Remove carriage return if present
         if (!line.empty() && line.back() == '\r') {
           line.pop_back();
         }
         
-        // Process the line
         processLine(line);
       }
       
-      // Prevent buffer from growing indefinitely
-      if (buffer_.size() > 1024) {
+      if (buffer_.size() > 2048) {
         buffer_.clear();
       }
     }
@@ -185,7 +212,6 @@ private:
   
   void processLine(const std::string& line)
   {
-    // Skip empty lines or lines that don't start with comma (non-data lines)
     if (line.empty() || line[0] != ',') {
       return;
     }
@@ -200,22 +226,36 @@ private:
     
     auto timestamp = this->now();
     
-    // Publish IMU data (IMUs are independent of driver)
+    // --- IMU data (independent of driver) ---
     if (data.imu1_status == 1) {
       publishImu1(data, timestamp);
     }
-    
     if (data.imu2_status == 1) {
       publishImu2(data, timestamp);
     }
     
-    // Only publish driver-dependent data when driver is alive
+    // --- Driver-dependent data ---
     if (data.driver_status == 1) {
       publishJointStates(data, timestamp);
       publishBatteryState(data, timestamp);
-      publishTemperature(data, timestamp);
+      publishBoardTemperature(data, timestamp);
     }
+    
+    // --- BME680 environmental data ---
+    if (data.bme_status == 1) {
+      publishBME680(data, timestamp);
+    }
+    
+    // --- PMS5003 air quality data ---
+    if (data.pms_status == 1) {
+      publishPMS5003(data, timestamp);
+    }
+    
+    // --- LED status (always publish if data valid) ---
+    publishLedStatus(data, timestamp);
   }
+  
+  // ===================== IMU Publishers =====================
   
   void publishImu1(const ESP32Data& data, const rclcpp::Time& timestamp)
   {
@@ -223,45 +263,27 @@ private:
     msg.header.stamp = timestamp;
     msg.header.frame_id = imu1_frame_id_;
     
-    // Linear acceleration (in m/s²)
     msg.linear_acceleration.x = ESP32Parser::rawAccelToMps2(data.ax1);
     msg.linear_acceleration.y = ESP32Parser::rawAccelToMps2(data.ay1);
     msg.linear_acceleration.z = ESP32Parser::rawAccelToMps2(data.az1);
     
-    // Angular velocity (in rad/s)
     msg.angular_velocity.x = ESP32Parser::rawGyroToRadps(data.gx1);
     msg.angular_velocity.y = ESP32Parser::rawGyroToRadps(data.gy1);
     msg.angular_velocity.z = ESP32Parser::rawGyroToRadps(data.gz1);
     
-    // No orientation data available from MPU6050 (raw gyro + accel only)
     msg.orientation.x = 0.0;
     msg.orientation.y = 0.0;
     msg.orientation.z = 0.0;
     msg.orientation.w = 1.0;
-    msg.orientation_covariance[0] = -1.0;  // Mark as unavailable (use filter to compute)
+    msg.orientation_covariance[0] = -1.0;
     
-    // Linear acceleration covariance (MPU6050 noise ~0.01 m/s²)
-    // Covariance matrix is 3x3 in row-major order [xx, xy, xz, yx, yy, yz, zx, zy, zz]
-    msg.linear_acceleration_covariance[0] = 0.0001;  // xx
-    msg.linear_acceleration_covariance[1] = 0.0;
-    msg.linear_acceleration_covariance[2] = 0.0;
-    msg.linear_acceleration_covariance[3] = 0.0;
-    msg.linear_acceleration_covariance[4] = 0.0001;  // yy
-    msg.linear_acceleration_covariance[5] = 0.0;
-    msg.linear_acceleration_covariance[6] = 0.0;
-    msg.linear_acceleration_covariance[7] = 0.0;
-    msg.linear_acceleration_covariance[8] = 0.0001;  // zz
+    msg.linear_acceleration_covariance[0] = 0.0001;
+    msg.linear_acceleration_covariance[4] = 0.0001;
+    msg.linear_acceleration_covariance[8] = 0.0001;
     
-    // Angular velocity covariance (MPU6050 noise ~0.01 rad/s)
-    msg.angular_velocity_covariance[0] = 0.0001;  // xx
-    msg.angular_velocity_covariance[1] = 0.0;
-    msg.angular_velocity_covariance[2] = 0.0;
-    msg.angular_velocity_covariance[3] = 0.0;
-    msg.angular_velocity_covariance[4] = 0.0001;  // yy
-    msg.angular_velocity_covariance[5] = 0.0;
-    msg.angular_velocity_covariance[6] = 0.0;
-    msg.angular_velocity_covariance[7] = 0.0;
-    msg.angular_velocity_covariance[8] = 0.0001;  // zz
+    msg.angular_velocity_covariance[0] = 0.0001;
+    msg.angular_velocity_covariance[4] = 0.0001;
+    msg.angular_velocity_covariance[8] = 0.0001;
     
     imu1_pub_->publish(msg);
   }
@@ -272,47 +294,32 @@ private:
     msg.header.stamp = timestamp;
     msg.header.frame_id = imu2_frame_id_;
     
-    // Linear acceleration (in m/s²)
     msg.linear_acceleration.x = ESP32Parser::rawAccelToMps2(data.ax2);
     msg.linear_acceleration.y = ESP32Parser::rawAccelToMps2(data.ay2);
     msg.linear_acceleration.z = ESP32Parser::rawAccelToMps2(data.az2);
     
-    // Angular velocity (in rad/s)
     msg.angular_velocity.x = ESP32Parser::rawGyroToRadps(data.gx2);
     msg.angular_velocity.y = ESP32Parser::rawGyroToRadps(data.gy2);
     msg.angular_velocity.z = ESP32Parser::rawGyroToRadps(data.gz2);
     
-    // No orientation data available from MPU6050 (raw gyro + accel only)
     msg.orientation.x = 0.0;
     msg.orientation.y = 0.0;
     msg.orientation.z = 0.0;
     msg.orientation.w = 1.0;
-    msg.orientation_covariance[0] = -1.0;  // Mark as unavailable (use filter to compute)
+    msg.orientation_covariance[0] = -1.0;
     
-    // Linear acceleration covariance (MPU6050 noise ~0.01 m/s²)
-    msg.linear_acceleration_covariance[0] = 0.0001;  // xx
-    msg.linear_acceleration_covariance[1] = 0.0;
-    msg.linear_acceleration_covariance[2] = 0.0;
-    msg.linear_acceleration_covariance[3] = 0.0;
-    msg.linear_acceleration_covariance[4] = 0.0001;  // yy
-    msg.linear_acceleration_covariance[5] = 0.0;
-    msg.linear_acceleration_covariance[6] = 0.0;
-    msg.linear_acceleration_covariance[7] = 0.0;
-    msg.linear_acceleration_covariance[8] = 0.0001;  // zz
+    msg.linear_acceleration_covariance[0] = 0.0001;
+    msg.linear_acceleration_covariance[4] = 0.0001;
+    msg.linear_acceleration_covariance[8] = 0.0001;
     
-    // Angular velocity covariance (MPU6050 noise ~0.01 rad/s)
-    msg.angular_velocity_covariance[0] = 0.0001;  // xx
-    msg.angular_velocity_covariance[1] = 0.0;
-    msg.angular_velocity_covariance[2] = 0.0;
-    msg.angular_velocity_covariance[3] = 0.0;
-    msg.angular_velocity_covariance[4] = 0.0001;  // yy
-    msg.angular_velocity_covariance[5] = 0.0;
-    msg.angular_velocity_covariance[6] = 0.0;
-    msg.angular_velocity_covariance[7] = 0.0;
-    msg.angular_velocity_covariance[8] = 0.0001;  // zz
+    msg.angular_velocity_covariance[0] = 0.0001;
+    msg.angular_velocity_covariance[4] = 0.0001;
+    msg.angular_velocity_covariance[8] = 0.0001;
     
     imu2_pub_->publish(msg);
   }
+  
+  // ===================== Motor / Battery Publishers =====================
   
   void publishJointStates(const ESP32Data& data, const rclcpp::Time& timestamp)
   {
@@ -322,11 +329,9 @@ private:
     msg.name.push_back(left_wheel_joint_);
     msg.name.push_back(right_wheel_joint_);
     
-    // Velocity in rad/s
     msg.velocity.push_back(ESP32Parser::rpmToRadps(data.left_measured_rpm));
     msg.velocity.push_back(ESP32Parser::rpmToRadps(data.right_measured_rpm));
     
-    // We don't have position or effort data
     msg.position.resize(2, 0.0);
     msg.effort.resize(2, 0.0);
     
@@ -341,8 +346,6 @@ private:
     msg.voltage = ESP32Parser::batteryMvToVolts(data.battery_mv);
     msg.temperature = ESP32Parser::tempDeciCToCelsius(data.temperature_deci_c);
     
-    // Estimate battery percentage (assuming 36V nominal battery)
-    // Full charge: ~42V, Empty: ~33V
     double voltage = msg.voltage;
     if (voltage >= 42.0) {
       msg.percentage = 1.0;
@@ -352,7 +355,6 @@ private:
       msg.percentage = (voltage - 33.0) / (42.0 - 33.0);
     }
     
-    // Set power supply status
     if (voltage < 35.0) {
       msg.power_supply_status = sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_DISCHARGING;
     } else {
@@ -366,77 +368,134 @@ private:
     battery_pub_->publish(msg);
   }
   
-  void publishTemperature(const ESP32Data& data, const rclcpp::Time& timestamp)
+  void publishBoardTemperature(const ESP32Data& data, const rclcpp::Time& timestamp)
   {
     auto msg = sensor_msgs::msg::Temperature();
     msg.header.stamp = timestamp;
     msg.header.frame_id = "base_footprint";
     
     msg.temperature = ESP32Parser::tempDeciCToCelsius(data.temperature_deci_c);
-    msg.variance = 1.0;  // ±1°C variance for board temperature sensor
+    msg.variance = 1.0;
     
-    temperature_pub_->publish(msg);
+    board_temp_pub_->publish(msg);
   }
+  
+  // ===================== BME680 Publishers =====================
+  
+  void publishBME680(const ESP32Data& data, const rclcpp::Time& timestamp)
+  {
+    // Temperature
+    {
+      auto msg = sensor_msgs::msg::Temperature();
+      msg.header.stamp = timestamp;
+      msg.header.frame_id = "bme680_link";
+      msg.temperature = ESP32Parser::bmeTempToCelsius(data.bme_temperature);
+      msg.variance = 0.5;  // BME680 accuracy ±0.5°C
+      bme_temp_pub_->publish(msg);
+    }
+    
+    // Relative Humidity
+    {
+      auto msg = sensor_msgs::msg::RelativeHumidity();
+      msg.header.stamp = timestamp;
+      msg.header.frame_id = "bme680_link";
+      msg.relative_humidity = ESP32Parser::bmeHumToPercent(data.bme_humidity) / 100.0;  // 0.0-1.0 range
+      msg.variance = 0.03;  // BME680 accuracy ±3%
+      bme_humidity_pub_->publish(msg);
+    }
+    
+    // Fluid Pressure
+    {
+      auto msg = sensor_msgs::msg::FluidPressure();
+      msg.header.stamp = timestamp;
+      msg.header.frame_id = "bme680_link";
+      msg.fluid_pressure = ESP32Parser::bmePresToPascals(data.bme_pressure);  // in Pascals
+      msg.variance = 100.0;  // BME680 accuracy ±1 hPa = 100 Pa
+      bme_pressure_pub_->publish(msg);
+    }
+    
+    // Gas Resistance
+    {
+      auto msg = std_msgs::msg::Float32();
+      msg.data = static_cast<float>(ESP32Parser::bmeGasToKohm(data.bme_gas_resistance));
+      bme_gas_pub_->publish(msg);
+    }
+  }
+  
+  // ===================== PMS5003 Publishers =====================
+  
+  void publishPMS5003(const ESP32Data& data, const rclcpp::Time& /* timestamp */)
+  {
+    {
+      auto msg = std_msgs::msg::UInt16();
+      msg.data = data.pm1_0;
+      pm1_0_pub_->publish(msg);
+    }
+    {
+      auto msg = std_msgs::msg::UInt16();
+      msg.data = data.pm2_5;
+      pm2_5_pub_->publish(msg);
+    }
+    {
+      auto msg = std_msgs::msg::UInt16();
+      msg.data = data.pm10_0;
+      pm10_pub_->publish(msg);
+    }
+  }
+  
+  // ===================== LED Publishers =====================
+  
+  void publishLedStatus(const ESP32Data& data, const rclcpp::Time& /* timestamp */)
+  {
+    auto msg = std_msgs::msg::String();
+    std::ostringstream ss;
+    ss << "S1:" << (int)data.strip1_r << (int)data.strip1_g << (int)data.strip1_b
+       << " S2:" << (int)data.strip2_r << (int)data.strip2_g << (int)data.strip2_b
+       << " S3:" << (int)data.strip3_r << (int)data.strip3_g << (int)data.strip3_b;
+    msg.data = ss.str();
+    led_status_pub_->publish(msg);
+  }
+  
+  // ===================== Subscriber Callbacks =====================
   
   void leftMotorCallback(const std_msgs::msg::Int16::SharedPtr msg)
   {
-    // Positive = forward, Negative = reverse
     int16_t rpm = msg->data;
     RCLCPP_INFO(this->get_logger(), "Left motor command: %d RPM", rpm);
-    sendLeftMotorCommand(rpm);
+    sendSerialCommand("l" + std::to_string(rpm) + "\n");
   }
   
   void rightMotorCallback(const std_msgs::msg::Int16::SharedPtr msg)
   {
-    // Positive = forward, Negative = reverse
     int16_t rpm = msg->data;
     RCLCPP_INFO(this->get_logger(), "Right motor command: %d RPM", rpm);
-    sendRightMotorCommand(rpm);
+    sendSerialCommand("r" + std::to_string(rpm) + "\n");
   }
   
-  void sendLeftMotorCommand(int16_t rpm)
+  void ledCommandCallback(const std_msgs::msg::String::SharedPtr msg)
+  {
+    // Forward LED command directly to ESP32 (e.g. "1r", "2g", "3b", "a")
+    std::string cmd = msg->data + "\n";
+    RCLCPP_INFO(this->get_logger(), "LED command: %s", msg->data.c_str());
+    sendSerialCommand(cmd);
+  }
+  
+  void sendSerialCommand(const std::string& command)
   {
     if (serial_fd_ < 0) {
       RCLCPP_ERROR(this->get_logger(), "Serial port not open!");
       return;
     }
     
-    // Format: "l<rpm>\n"
-    std::string command = "l" + std::to_string(rpm) + "\n";
-    
-    RCLCPP_INFO(this->get_logger(), "Sending to ESP32: %s", command.c_str());
-    
     ssize_t written = write(serial_fd_, command.c_str(), command.length());
     
     if (written < 0) {
       RCLCPP_ERROR(this->get_logger(), "Failed to write to serial port");
-    } else {
-      RCLCPP_INFO(this->get_logger(), "Sent %ld bytes", written);
-    }
-  }
-  
-  void sendRightMotorCommand(int16_t rpm)
-  {
-    if (serial_fd_ < 0) {
-      RCLCPP_ERROR(this->get_logger(), "Serial port not open!");
-      return;
-    }
-    
-    // Format: "r<rpm>\n"
-    std::string command = "r" + std::to_string(rpm) + "\n";
-    
-    RCLCPP_INFO(this->get_logger(), "Sending to ESP32: %s", command.c_str());
-    
-    ssize_t written = write(serial_fd_, command.c_str(), command.length());
-    
-    if (written < 0) {
-      RCLCPP_ERROR(this->get_logger(), "Failed to write to serial port");
-    } else {
-      RCLCPP_INFO(this->get_logger(), "Sent %ld bytes", written);
     }
   }
 
-  // Member variables
+  // ===================== Member Variables =====================
+  
   int serial_fd_;
   std::string serial_port_;
   int baud_rate_;
@@ -449,14 +508,33 @@ private:
   
   ESP32Parser parser_;
   
+  // Existing publishers
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu2_pub_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
   rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr battery_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr board_temp_pub_;
   
+  // BME680 publishers
+  rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr bme_temp_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::RelativeHumidity>::SharedPtr bme_humidity_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr bme_pressure_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr bme_gas_pub_;
+  
+  // PMS5003 publishers
+  rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr pm1_0_pub_;
+  rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr pm2_5_pub_;
+  rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr pm10_pub_;
+  
+  // LED publisher
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr led_status_pub_;
+  
+  // Motor subscribers
   rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr left_motor_sub_;
   rclcpp::Subscription<std_msgs::msg::Int16>::SharedPtr right_motor_sub_;
+  
+  // LED subscriber
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr led_cmd_sub_;
   
   rclcpp::TimerBase::SharedPtr timer_;
 };
