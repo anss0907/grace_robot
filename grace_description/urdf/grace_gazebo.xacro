@@ -22,7 +22,7 @@
     <maxVel>0.1</maxVel>
     <fdir1>1 0 0</fdir1>
   </gazebo>
-    
+
   <!-- Caster Wheels -->
   <gazebo reference="caster_back_left_link">
     <mu1>0.01</mu1>
@@ -32,7 +32,7 @@
     <minDepth>0.001</minDepth>
     <maxVel>1.0</maxVel>
   </gazebo>
-    
+
   <gazebo reference="caster_back_right_link">
     <mu1>0.01</mu1>
     <mu2>0.01</mu2>
@@ -60,10 +60,9 @@
     <maxVel>1.0</maxVel>
   </gazebo>
 
-
   <!-- ROS 2 Control -->
   <gazebo>
-    <!-- ROS 2 Humble -->
+    <!-- ROS 2 Humble (Ignition) -->
     <xacro:if value="$(arg is_ignition)">
       <plugin filename="ign_ros2_control-system" name="ign_ros2_control::IgnitionROS2ControlPlugin">
         <parameters>$(find grace_controller)/config/grace_controllers.yaml</parameters>
@@ -75,7 +74,7 @@
       </plugin>
     </xacro:if>
 
-    <!-- ROS 2 Iron or above -->
+    <!-- ROS 2 Iron or above (Gazebo Sim) -->
     <xacro:unless value="$(arg is_ignition)">
       <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
         <parameters>$(find grace_controller)/config/grace_controllers.yaml</parameters>
@@ -158,7 +157,7 @@
           </horizontal>
         </scan>
         <range>
-          <min>0.150000</min>
+          <min>0.25</min>  <!-- bumped from 0.15 to ignore camera rod at ~0.195m -->
           <max>16.0</max>
           <resolution>0.02</resolution>
         </range>
@@ -171,32 +170,84 @@
     </sensor>
   </gazebo>
 
-  <!-- Camera Sensor -->
-  <gazebo reference="camera_link">
-    <sensor name="camera" type="camera">
-      <always_on>true</always_on>
-      <visualize>true</visualize>
-      <update_rate>30</update_rate>
-      <topic>camera/image_raw</topic>
-      <gz_frame_id>camera_optical_frame</gz_frame_id>
-      <camera>
-        <horizontal_fov>1.3962634</horizontal_fov>
-        <image>
-          <width>640</width>
-          <height>480</height>
-          <format>R8G8B8</format>
-        </image>
-        <clip>
-          <near>0.1</near>
-          <far>300</far>
-        </clip>
-        <noise>
-          <type>gaussian</type>
-          <mean>0.0</mean>
-          <stddev>0.007</stddev>
-        </noise>
-      </camera>
-    </sensor>
-  </gazebo>
+  <!-- =================================================================
+       Camera Sensor (conditional)
+       use_camera:=false      → no camera spawned (fastest, default)
+       use_camera:=true       → lightweight RGB-only camera (fast)
+       use_depth_camera:=true → full D435i RGBD camera (slow, GPU heavy)
+       ================================================================= -->
+  <xacro:arg name="use_camera"       default="false"/>
+  <xacro:arg name="use_depth_camera" default="false"/>
+
+  <xacro:if value="$(arg use_camera)">
+
+    <!-- Option A: Lightweight RGB-only camera (original working sensor) -->
+    <xacro:unless value="$(arg use_depth_camera)">
+      <gazebo reference="camera_link">
+        <sensor name="camera" type="camera">
+          <always_on>true</always_on>
+          <visualize>true</visualize>
+          <update_rate>30</update_rate>
+          <topic>camera/image_raw</topic>
+          <gz_frame_id>camera_optical_frame</gz_frame_id>
+          <camera>
+            <horizontal_fov>1.3962634</horizontal_fov>
+            <image>
+              <width>640</width>
+              <height>480</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>300</far>
+            </clip>
+            <noise>
+              <type>gaussian</type>
+              <mean>0.0</mean>
+              <stddev>0.007</stddev>
+            </noise>
+          </camera>
+        </sensor>
+      </gazebo>
+    </xacro:unless>
+
+    <!-- Option B: Full Intel RealSense D435i RGBD camera (GPU heavy) -->
+    <xacro:if value="$(arg use_depth_camera)">
+      <gazebo reference="camera_link">
+        <sensor name="realsense_d435i" type="rgbd_camera">
+          <always_on>true</always_on>
+          <visualize>true</visualize>
+          <update_rate>15</update_rate>
+          <topic>camera</topic>
+          <gz_frame_id>camera_optical_frame</gz_frame_id>
+          <camera>
+            <!-- D435i RGB FOV: 69.4° horizontal = 1.211 rad -->
+            <horizontal_fov>1.211</horizontal_fov>
+            <image>
+              <width>640</width>
+              <height>480</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.3</near>
+              <far>3.0</far>
+            </clip>
+            <depth_camera>
+              <clip>
+                <near>0.3</near>
+                <far>3.0</far>
+              </clip>
+            </depth_camera>
+            <noise>
+              <type>gaussian</type>
+              <mean>0.0</mean>
+              <stddev>0.007</stddev>
+            </noise>
+          </camera>
+        </sensor>
+      </gazebo>
+    </xacro:if>
+
+  </xacro:if>
 
 </robot>
