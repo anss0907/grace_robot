@@ -1,0 +1,94 @@
+<?xml version="1.0" ?>
+<sdf version="1.7">
+    <world name="human_walking_world">
+        <physics type="ode">
+            <max_step_size>0.01</max_step_size>
+        </physics>
+
+        <!-- Sun -->
+        <light type="directional" name="sun">
+            <cast_shadows>true</cast_shadows>
+            <pose>0 0 10 0 0 0</pose>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <attenuation>
+                <range>1000</range>
+                <constant>0.9</constant>
+                <linear>0.01</linear>
+                <quadratic>0.001</quadratic>
+            </attenuation>
+            <direction>-0.5 0.1 -0.9</direction>
+        </light>
+
+        <!-- Ground Plane -->
+        <model name="ground_plane">
+            <static>true</static>
+            <link name="link">
+                <collision name="collision">
+                    <geometry>
+                        <plane>
+                            <normal>0 0 1</normal>
+                        </plane>
+                    </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <plane>
+                            <normal>0 0 1</normal>
+                            <size>100 100</size>
+                        </plane>
+                    </geometry>
+                    <material>
+                        <ambient>0.8 0.8 0.8 1</ambient>
+                        <diffuse>0.8 0.8 0.8 1</diffuse>
+                        <specular>0.8 0.8 0.8 1</specular>
+                    </material>
+                </visual>
+            </link>
+        </model>
+
+        <!-- Walking Human Actor -->
+        <actor name="walking_human">
+            <skin>
+                <filename>https://fuel.gazebosim.org/1.0/Mingfei/models/actor/tip/files/meshes/walk.dae</filename>
+                <scale>1.0</scale>
+            </skin>
+            <animation name="walk">
+                <filename>https://fuel.gazebosim.org/1.0/Mingfei/models/actor/tip/files/meshes/walk.dae</filename>
+                <interpolate_x>true</interpolate_x>
+            </animation>
+            <script>
+                <loop>true</loop>
+                <delay_start>1.0</delay_start>
+                <auto_start>true</auto_start>
+                <trajectory id="0" type="walk">
+                    <!-- Start 2m in front of robot, walk forward -->
+                    <waypoint>
+                        <time>0</time>
+                        <pose>2 0 1.0 0 0 0</pose>
+                    </waypoint>
+                    <waypoint>
+                        <time>12</time>
+                        <pose>8 0 1.0 0 0 0</pose>
+                    </waypoint>
+                    <!-- Pause and turn around -->
+                    <waypoint>
+                        <time>14</time>
+                        <pose>8 0 1.0 0 0 3.14</pose>
+                    </waypoint>
+                    <!-- Walk back -->
+                    <waypoint>
+                        <time>26</time>
+                        <pose>2 0 1.0 0 0 3.14</pose>
+                    </waypoint>
+                    <!-- Pause and turn to face forward again -->
+                    <waypoint>
+                        <time>28</time>
+                        <pose>2 0 1.0 0 0 0</pose>
+                    </waypoint>
+                </trajectory>
+            </script>
+        </actor>
+
+    </world>
+</sdf>
