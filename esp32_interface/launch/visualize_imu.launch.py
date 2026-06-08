@@ -4,7 +4,7 @@ Complete launch file for ESP32 IMU visualization in RViz2
 
 Starts:
 1. ESP32 interface node (reads and publishes raw IMU data)
-2. Static TF transforms (base_footprint -> base_link -> imu1_link, imu2_link)
+2. Static TF transforms (base_footprint -> base_link -> imu1_link, imu2_link, bme680_link)
 3. Madgwick filters for both IMUs (computes orientation)
 4. RViz2 with pre-configured display
 
@@ -28,6 +28,12 @@ def generate_launch_description():
         description='Serial port for ESP32'
     )
     
+    enable_csv_arg = DeclareLaunchArgument(
+        'enable_csv_logging',
+        default_value='true',
+        description='Enable CSV data logging'
+    )
+    
     # ESP32 Interface Node
     esp32_node = Node(
         package='esp32_interface',
@@ -42,6 +48,7 @@ def generate_launch_description():
             'imu2_frame_id': 'imu2_link',
             'left_wheel_joint': 'left_wheel_joint',
             'right_wheel_joint': 'right_wheel_joint',
+            'enable_csv_logging': LaunchConfiguration('enable_csv_logging'),
         }]
     )
     
@@ -67,6 +74,14 @@ def generate_launch_description():
         executable='static_transform_publisher',
         name='tf_base_link_to_imu2',
         arguments=['-0.10', '0', '0.05', '0', '0', '0', 'base_link', 'imu2_link']
+    )
+    
+    # Static TF: base_link -> bme680_link (sensor mounted on PCB)
+    tf_base_to_bme680 = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='tf_base_link_to_bme680',
+        arguments=['0', '0', '0.10', '0', '0', '0', 'base_link', 'bme680_link']
     )
     
     # Madgwick Filter for IMU1 (computes orientation from raw gyro+accel)
@@ -122,10 +137,12 @@ def generate_launch_description():
     
     return LaunchDescription([
         serial_port_arg,
+        enable_csv_arg,
         esp32_node,
         tf_footprint_to_base,
         tf_base_to_imu1,
         tf_base_to_imu2,
+        tf_base_to_bme680,
         imu1_filter,
         imu2_filter,
         rviz_node,

@@ -3,7 +3,7 @@
 <package format="3">
   <name>esp32_interface</name>
   <version>0.0.0</version>
-  <description>ROS2 interface node for ESP32 with dual IMUs and wheel encoders</description>
+  <description>ROS2 interface node for ESP32 with dual IMUs, hoverboard motors, BME680 environment sensor, PMS5003 air quality sensor, and RGB LED strips</description>
   <maintainer email="muhammadanss0907@gmail.com">anss0907</maintainer>
   <license>MIT</license>
 
@@ -12,6 +12,7 @@
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>grace_msgs</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

@@ -1,0 +1,178 @@
+// ---------------------------------------------------------
+// PIN DEFINITIONS
+// ---------------------------------------------------------
+
+// Ultrasonic Sensors (TRIG, ECHO)
+const int trigPins[4] = {2, 4, 6, 8};
+const int echoPins[4] = {3, 5, 7, 9};
+
+// Voltage Sensors (Analog)
+const int vsPins[2] = {A6, A7};
+
+// Current Sensors (Analog)
+const int csPins[4] = {A2, A3, A4, A5};
+
+// Environmental Sensors (Analog)
+const int mqPin = A0;
+const int mhmqPin = A1;
+
+// Double Channel Relay
+const int relay1Pin = 10;
+const int relay2Pin = 11;
+
+// ---------------------------------------------------------
+// VARIABLES FOR TIMING & STATES
+// ---------------------------------------------------------
+unsigned long previousMillis = 0;
+const long interval = 500; // Output data every 500 milliseconds
+
+// Variables to track relay states (0 = OFF, 1 = ON)
+int relay1State = 0; 
+int relay2State = 0;
+
+// Note: Assuming standard Active-LOW relays. 
+// HIGH = Relay OFF, LOW = Relay ON.
+const int RELAY_ON = LOW;
+const int RELAY_OFF = HIGH;
+
+// ---------------------------------------------------------
+// HELPER FUNCTIONS
+// ---------------------------------------------------------
+float readUltrasonicCM(int trigPin, int echoPin) {
+  const unsigned long timeoutUs = 38000UL; // ~6.5 m max round-trip time
+  long bestDuration = 0;
+
+  // Try multiple times to reduce occasional missed echoes.
+  for (int attempt = 0; attempt < 3; attempt++) {
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(5);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+
+    long duration = pulseIn(echoPin, HIGH, timeoutUs);
+    if (duration > 0 && (bestDuration == 0 || duration < bestDuration)) {
+      bestDuration = duration;
+    }
+
+    // Small gap to avoid overlap/crosstalk between pings.
+    delay(5);
+  }
+
+  if (bestDuration == 0) {
+    return -1.0;
+  }
+
+  return (bestDuration * 0.0343) / 2.0;
+}
+
+// ---------------------------------------------------------
+// SETUP
+// ---------------------------------------------------------
+void setup() {
+  Serial.begin(9600);
+
+  // Initialize Ultrasonic Pins
+  for (int i = 0; i < 4; i++) {
+    pinMode(trigPins[i], OUTPUT);
+    pinMode(echoPins[i], INPUT);
+    digitalWrite(trigPins[i], LOW);
+  }
+
+  // Initialize Relays
+  pinMode(relay1Pin, OUTPUT);
+  pinMode(relay2Pin, OUTPUT);
+  
+  // Set relays to default OFF state
+  digitalWrite(relay1Pin, RELAY_OFF); 
+  digitalWrite(relay2Pin, RELAY_OFF);
+  
+
+  // Print startup message
+  Serial.println("========================================");
+  Serial.println("   Arduino Hover System - READY");
+  Serial.println("========================================");
+  Serial.println();
+}
+
+// ---------------------------------------------------------
+// MAIN LOOP
+// ---------------------------------------------------------
+void loop() {
+  // 1. Check for Serial Commands to control Relays
+  if (Serial.available() > 0) {
+    char command = Serial.read();
+    
+    switch (command) {
+      case '0': // Both OFF
+        digitalWrite(relay1Pin, RELAY_OFF);
+        digitalWrite(relay2Pin, RELAY_OFF);
+        relay1State = 0;
+        relay2State = 0;
+        break;
+      case '1': // IN1 ON, IN2 OFF
+        digitalWrite(relay1Pin, RELAY_ON);
+        digitalWrite(relay2Pin, RELAY_OFF);
+        relay1State = 1;
+        relay2State = 0;
+        break;
+      case '2': // IN2 ON, IN1 OFF
+        digitalWrite(relay1Pin, RELAY_OFF);
+        digitalWrite(relay2Pin, RELAY_ON);
+        relay1State = 0;
+        relay2State = 1;
+        break;
+      case '3': // Both ON
+        digitalWrite(relay1Pin, RELAY_ON);
+        digitalWrite(relay2Pin, RELAY_ON);
+        relay1State = 1;
+        relay2State = 1;
+        break;
+    }
+  }
+
+  // 2. Non-blocking sensor reading and CSV output
+  unsigned long currentMillis = millis();
+  
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+
+    // Build single line output with labels
+    String output = "";
+    
+    // Read Ultrasonic Sensors
+    for (int i = 0; i < 4; i++) {
+      float distance = readUltrasonicCM(trigPins[i], echoPins[i]);
+      
+      output += "US" + String(i + 1) + ":";
+      output += String(distance, 1) + "cm | ";
+    }
+
+    // Read Voltage Sensors
+    for (int i = 0; i < 2; i++) {
+      int rawVS = analogRead(vsPins[i]);
+      output += "VS" + String(i + 1) + ":";
+      output += String(rawVS) + " | ";
+    }
+
+    // Read Current Sensors
+    for (int i = 0; i < 4; i++) {
+      int rawCS = analogRead(csPins[i]);
+      float voltageCS = (rawCS / 1023.0) * 5.0; 
+      float currentAmps = (voltageCS - 2.5) / 0.100; 
+      
+      output += "CS" + String(i + 1) + ":";
+      output += String(currentAmps, 2) + "A | ";
+    }
+
+    // Read Gas Sensors
+    output += "MQ:" + String(analogRead(mqPin)) + " | ";
+    output += "MHMQ:" + String(analogRead(mhmqPin)) + " | ";
+
+    // Relay States
+    output += "R1:" + String(relay1State ? "ON" : "OFF") + " | ";
+    output += "R2:" + String(relay2State ? "ON" : "OFF");
+
+    Serial.println(output);
+  }
+}

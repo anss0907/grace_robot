@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>arduino_nano_interface</name>
+  <version>0.0.0</version>
+  <description>
+    ROS 2 interface node for the Arduino Nano hover/power system on Grace robot.
+    Reads ultrasonic proximity (4 directions), dual-battery voltage and current,
+    dual gas sensors (MQ + MH-MQ), and dual charger adapter relay state.
+    Publishes: /nano/ultrasonic  /nano/gas  /nano/power  /nano/charger_relay
+    Subscribes: /nano/relay_command (relay control)
+    Logs gas and power data to CSV and Supabase.
+  </description>
+  <maintainer email="muhammadanss0907@gmail.com">Muhammad Anss</maintainer>
+  <license>MIT</license>
+  <author email="muhammadanss0907@gmail.com">Muhammad Anss</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>grace_msgs</depend>
+
+  <exec_depend>python3-serial</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

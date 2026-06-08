@@ -1,4 +1,4 @@
-# ESP32 Interface Configuration Example
+# ESP32 Interface Configuration
 # Copy this to your own config file and modify as needed
 
 esp32_interface:
@@ -18,3 +18,7 @@ esp32_interface:
     # Joint names for robot state publisher
     left_wheel_joint: "left_wheel_joint"
     right_wheel_joint: "right_wheel_joint"
+    
+    # CSV data logging
+    enable_csv_logging: true
+    # csv_log_dir: ""  # Leave empty for default (esp32_interface/logs/)

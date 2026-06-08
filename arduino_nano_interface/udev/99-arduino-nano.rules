@@ -1,0 +1,15 @@
+# Arduino Nano — Grace Robot
+# Chip: FTDI FT232RL  (idVendor=0403, idProduct=6001)
+# Serial number on the specific board used on Grace
+#
+# Creates symlink /dev/grace_nano when the Nano is plugged in.
+# Mode 0666 allows ROS nodes to access without sudo.
+#
+# INSTALL:
+#   sudo cp udev/99-arduino-nano.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# VERIFY (after replug):
+#   ls -la /dev/grace_nano
+#
+KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{serial}=="A5069RR4", MODE:="0666", GROUP:="dialout", SYMLINK+="grace_nano"

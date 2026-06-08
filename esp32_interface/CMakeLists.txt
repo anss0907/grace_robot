@@ -10,23 +10,38 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(grace_msgs REQUIRED)
 
 # Include directories
 include_directories(include)
 
-# Add executable
+# Add executables
 add_executable(esp32_interface_node src/esp32_interface_node.cpp)
+add_executable(led_showcase_node src/led_showcase_node.cpp)
 
 # Link dependencies
 ament_target_dependencies(esp32_interface_node
   rclcpp
   sensor_msgs
   std_msgs
+  grace_msgs
+)
+
+ament_target_dependencies(led_showcase_node
+  rclcpp
+  std_msgs
 )
 
 # Install executables
 install(TARGETS
   esp32_interface_node
+  led_showcase_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install Python scripts
+install(PROGRAMS
+  scripts/esp32_supabase_pusher.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
