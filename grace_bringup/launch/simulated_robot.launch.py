@@ -65,6 +65,7 @@ def generate_launch_description():
     use_camera          = LaunchConfiguration("use_camera")
     use_depth_camera    = LaunchConfiguration("use_depth_camera")
     use_human_following = LaunchConfiguration("use_human_following")
+    use_rosbridge       = LaunchConfiguration("use_rosbridge")
 
     use_slam_arg = DeclareLaunchArgument("use_slam", default_value="false")
 
@@ -96,6 +97,12 @@ def generate_launch_description():
         "use_human_following",
         default_value="false",
         description="Enable human following node. Remember to also set use_camera:=true."
+    )
+
+    use_rosbridge_arg = DeclareLaunchArgument(
+        "use_rosbridge",
+        default_value="true",
+        description="Enable rosbridge_server for web dashboard communication on port 9090"
     )
 
     gazebo = IncludeLaunchDescription(
@@ -189,6 +196,25 @@ def generate_launch_description():
         condition=IfCondition(use_camera),
     )
 
+    # Web video server for teleop camera stream
+    web_video_server = Node(
+        package="web_video_server",
+        executable="web_video_server",
+        condition=IfCondition(use_camera),
+        parameters=[{
+            "port": 8081,
+            "default_stream_type": "mjpeg",
+        }],
+    )
+
+    # ROSBridge Server for Web Dashboard (Port 9090)
+    rosbridge_server = Node(
+        package="rosbridge_server",
+        executable="rosbridge_websocket",
+        condition=IfCondition(use_rosbridge),
+        parameters=[{"port": 9090}],
+    )
+
     return LaunchDescription([
         use_slam_arg,
         map_name_arg,
@@ -196,6 +222,7 @@ def generate_launch_description():
         use_camera_arg,
         use_depth_camera_arg,
         use_human_following_arg,
+        use_rosbridge_arg,
         gazebo,
         controller,
         joystick,
@@ -205,4 +232,6 @@ def generate_launch_description():
         human_following,
         rviz,
         image_view,
+        web_video_server,
+        rosbridge_server,
     ])

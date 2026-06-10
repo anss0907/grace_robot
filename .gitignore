@@ -23,3 +23,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 personalNotes/
+grace_from_jetson/
+currenttree.txt
+Differencebetweenoldandnewworkspace.txt
+tree.txt
